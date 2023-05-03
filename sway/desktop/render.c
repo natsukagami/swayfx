@@ -526,6 +526,16 @@ static void render_unmanaged(struct sway_output *output,
 }
 #endif
 
+static void render_input_popups(struct sway_output *output,
+		pixman_region32_t *damage, struct wl_list *input_popups) {
+	struct render_data data = {
+		.damage = damage,
+		.deco_data = get_undecorated_decoration_data(),
+	};
+	output_input_popups_for_each_surface(output, input_popups,
+		render_surface_iterator, &data);
+}
+
 static void render_drag_icons(struct sway_output *output,
 		pixman_region32_t *damage, struct wl_list *drag_icons) {
 	struct render_data data = {
@@ -1859,6 +1869,10 @@ void output_render(struct sway_output *output, struct timespec *when,
 		goto renderer_end;
 	}
 
+	struct sway_seat *seat = input_manager_current_seat();
+	struct sway_container *focus = seat_get_focused_container(seat);
+	// here use seat
+
 	if (output_has_opaque_overlay_layer_surface(output)) {
 		goto render_overlay;
 	}
@@ -1986,8 +2000,6 @@ void output_render(struct sway_output *output, struct timespec *when,
 
 	render_seatops(output, damage);
 
-	struct sway_seat *seat = input_manager_current_seat();
-	struct sway_container *focus = seat_get_focused_container(seat);
 	if (focus && focus->view) {
 		struct decoration_data deco_data = {
 			.alpha = focus->alpha,
@@ -2010,6 +2022,7 @@ render_overlay:
 		&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY]);
 	render_layer_popups(output, damage,
 		&output->layers[ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY]);
+	render_input_popups(output, damage, &seat->im_relay.input_popups);
 	render_drag_icons(output, damage, &root->drag_icons);
 
 renderer_end:
